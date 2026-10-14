@@ -1,10 +1,56 @@
 @import "tailwindcss";
 
+/* Greenmarket palette: mint ground, deep-green ink, coral and peach accents. */
+:root {
+  --ground: #dfeee3;
+  --card: #ffffff;
+  --ink: #0e3b2e;
+  --muted: #3f6b5b;
+  --soft: #eef6f0;
+  --peach: #f3e3d3;
+  --sage: #b9d9c3;
+  --sage-2: #cde5d4;
+  --line: #c9dfd0;
+  --coral: #ff8a65;
+  --on-coral: #0e3b2e;
+  --good: #1f7a4d;
+  --danger: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0d211b;
+    --card: #15312a;
+    --ink: #e4f1e8;
+    --muted: #9ec4b3;
+    --soft: #1c3f35;
+    --peach: #3a2f27;
+    --sage: #1a3b31;
+    --sage-2: #21463b;
+    --line: #2a5045;
+    --good: #6fd4a0;
+    --danger: #ff8a80;
+  }
+}
+
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-outfit);
+  --color-ground: var(--ground);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-soft: var(--soft);
+  --color-peach: var(--peach);
+  --color-sage: var(--sage);
+  --color-sage-2: var(--sage-2);
+  --color-line: var(--line);
+  --color-coral: var(--coral);
+  --color-on-coral: var(--on-coral);
+  --color-good: var(--good);
+  --color-danger: var(--danger);
 }
 
 body {
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-outfit), system-ui, sans-serif;
   overscroll-behavior: none;
 }

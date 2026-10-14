@@ -2,29 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BookmarkIcon, CardsIcon, PinIcon } from "./icons";
 
 const TABS = [
-  { href: "/swipe", label: "Swipe", icon: "🔥" },
-  { href: "/saved", label: "Saved", icon: "♥" },
-  { href: "/", label: "Location", icon: "📍" },
+  { href: "/swipe", label: "Swipe", Icon: CardsIcon },
+  { href: "/saved", label: "Saved", Icon: BookmarkIcon },
+  { href: "/", label: "Location", Icon: PinIcon },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="sticky bottom-0 z-20 border-t border-zinc-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-      <ul className="mx-auto flex max-w-md">
-        {TABS.map((t) => {
-          const active = pathname === t.href;
+    <nav className="sticky bottom-0 z-20 bg-ground pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto mb-3 flex max-w-md gap-1 px-4">
+        {TABS.map(({ href, label, Icon }) => {
+          const active = pathname === href;
           return (
-            <li key={t.href} className="flex-1">
+            <li key={href} className="flex-1">
               <Link
-                href={t.href}
+                href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center py-2 text-xs font-medium ${active ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`}
+                className={`flex min-h-12 items-center justify-center gap-2 rounded-full text-sm font-semibold transition ${
+                  active ? "bg-ink text-card" : "text-muted hover:bg-sage-2"
+                }`}
               >
-                <span className="text-lg leading-none">{t.icon}</span>
-                {t.label}
+                <Icon className="h-5 w-5" />
+                {label}
               </Link>
             </li>
           );

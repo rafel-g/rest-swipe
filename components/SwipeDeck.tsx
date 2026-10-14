@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RestaurantCard, type CardHandle } from "./RestaurantCard";
 import { FilterBar } from "./FilterBar";
+import { HeartIcon, UndoIcon, XIcon } from "./icons";
 import { api, ApiError, EMPTY_FILTERS, type Card, type FilterOption, type Filters } from "@/lib/client";
 
 const PAGE_SIZE = 10;
@@ -155,15 +156,24 @@ export function SwipeDeck() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <FilterBar filters={filters} onChange={changeFilters} cuisines={filterData?.cuisines ?? []} tags={filterData?.tags ?? []} />
+      <FilterBar
+        filters={filters}
+        onChange={changeFilters}
+        cuisines={filterData?.cuisines ?? []}
+        tags={filterData?.tags ?? []}
+        location={filterData?.location ?? null}
+        radiusMi={filterData?.radiusMi ?? null}
+      />
 
       {filterData && filterData.untagged > 0 && (
-        <p className="mx-4 mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="mx-4 mb-2 rounded-2xl bg-peach px-3 py-2 text-xs font-medium">
           {filterData.untagged} restaurants are still being categorized and won&apos;t show under a cuisine yet.
         </p>
       )}
 
-      <div className="relative mx-4 min-h-0 flex-1">
+      <div className="relative mx-6 mt-1 min-h-0 flex-1">
+        <div aria-hidden className="absolute inset-0 -rotate-[4deg] rounded-[36px] bg-sage" />
+        <div aria-hidden className="absolute inset-0 rotate-2 rounded-[36px] bg-sage-2" />
         {cards
           .slice(0, VISIBLE)
           .map((card, i) => (
@@ -179,38 +189,38 @@ export function SwipeDeck() {
           .reverse()}
 
         {!top && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[36px] bg-card p-6 text-center">
             {loading ? (
-              <p className="text-zinc-500">Finding your next spot…</p>
+              <p className="text-muted">Finding your next spot…</p>
             ) : error?.code === "no_search" ? (
               <>
-                <p className="text-zinc-600 dark:text-zinc-400">No restaurants loaded yet.</p>
-                <Link href="/" className="rounded-full bg-zinc-900 px-5 py-2 font-semibold text-white dark:bg-white dark:text-zinc-900">
+                <p className="text-muted">No restaurants loaded yet.</p>
+                <Link href="/" className="rounded-full bg-ink px-5 py-2.5 font-semibold text-card">
                   Set your location
                 </Link>
               </>
             ) : error ? (
               <>
-                <p className="text-rose-600">{error.message}</p>
-                <button onClick={retry} className="rounded-full bg-zinc-900 px-5 py-2 font-semibold text-white dark:bg-white dark:text-zinc-900">
+                <p className="text-danger">{error.message}</p>
+                <button onClick={retry} className="rounded-full bg-ink px-5 py-2.5 font-semibold text-card">
                   Try again
                 </button>
               </>
             ) : (
               <>
-                <p className="text-zinc-600 dark:text-zinc-400">No more matches with these filters.</p>
+                <p className="text-muted">No more matches with these filters.</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {!filters.includePassed && (
                     <button
                       onClick={() => changeFilters((f) => ({ ...f, includePassed: true }))}
-                      className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-zinc-900"
+                      className="rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-card"
                     >
                       Show passed again
                     </button>
                   )}
                   <button
                     onClick={() => changeFilters(EMPTY_FILTERS)}
-                    className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-semibold dark:border-zinc-700"
+                    className="rounded-full border-2 border-ink px-4 py-2 text-sm font-semibold"
                   >
                     Clear filters
                   </button>
@@ -221,35 +231,38 @@ export function SwipeDeck() {
         )}
       </div>
 
-      {error && top && <p className="mx-4 mt-2 text-center text-xs text-rose-600">{error.message}</p>}
+      {error && top && <p className="mx-4 mt-2 text-center text-xs text-danger">{error.message}</p>}
 
-      <div className="flex items-center justify-center gap-5 py-4">
+      <div className="flex items-center justify-center gap-[18px] pb-2 pt-6">
         <button
           aria-label="Undo last swipe"
           onClick={undo}
           disabled={history.length === 0}
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-xl text-amber-500 shadow-md ring-1 ring-black/5 transition active:scale-95 disabled:opacity-30 dark:bg-zinc-900 dark:ring-white/10"
+          className="flex h-[50px] w-[50px] items-center justify-center rounded-full bg-card transition active:scale-95 disabled:opacity-40"
         >
-          ↺
+          <UndoIcon className="h-5 w-5" />
         </button>
         <button
-          aria-label="No"
+          aria-label="Pass"
           onClick={() => topRef.current?.fly("no")}
           disabled={!top}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl text-rose-500 shadow-lg ring-1 ring-black/5 transition active:scale-95 disabled:opacity-30 dark:bg-zinc-900 dark:ring-white/10"
+          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-[3px] border-ink bg-card transition active:scale-95 disabled:opacity-40"
         >
-          ✕
+          <XIcon className="h-[30px] w-[30px]" />
         </button>
         <button
-          aria-label="Yes"
+          aria-label="Save"
           onClick={() => topRef.current?.fly("yes")}
           disabled={!top}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl text-emerald-500 shadow-lg ring-1 ring-black/5 transition active:scale-95 disabled:opacity-30 dark:bg-zinc-900 dark:ring-white/10"
+          className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-[3px] border-on-coral bg-coral text-on-coral transition active:scale-95 disabled:opacity-40"
         >
-          ♥
+          <HeartIcon className="h-8 w-8" />
         </button>
       </div>
-      <p className="hidden pb-2 text-center text-xs text-zinc-400 sm:block">← no · → yes · Z undo</p>
+      <p className="pb-3 text-center text-[13px] font-medium text-muted">
+        <span className="sm:hidden">Swipe right to save · left to pass</span>
+        <span className="hidden sm:inline">→ save · ← pass · Z undo</span>
+      </p>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowUpRightIcon, PlateIcon } from "./icons";
 import { api, labelOf, mapsUrl, photoUrl, priceLabel } from "@/lib/client";
 
 type Saved = {
@@ -19,9 +20,13 @@ type Saved = {
   saved_at: string;
 };
 
+// Photo placeholders rotate through the palette's pastels so the grid isn't one flat color.
+const TINTS = ["bg-peach", "bg-sage-2", "bg-soft", "bg-sage"];
+
 export function SavedList() {
   const [saved, setSaved] = useState<Saved[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tag, setTag] = useState<string | null>(null);
 
   useEffect(() => {
     api<{ saved: Saved[] }>("/api/saved")
@@ -29,51 +34,92 @@ export function SavedList() {
       .catch((e) => setError(e.message));
   }, []);
 
-  if (error) return <p className="px-4 text-rose-600">{error}</p>;
-  if (!saved) return <p className="px-4 text-zinc-500">Loading…</p>;
-  if (saved.length === 0)
-    return (
-      <div className="px-4 text-center text-zinc-600 dark:text-zinc-400">
-        <p>Nothing saved yet.</p>
-        <Link href="/swipe" className="mt-3 inline-block font-semibold text-sky-600 dark:text-sky-400">
-          Start swiping →
-        </Link>
-      </div>
-    );
+  // The most common tags among saved places become quick filters.
+  const topTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of saved ?? []) for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([t]) => t);
+  }, [saved]);
+
+  const shown = tag ? (saved ?? []).filter((r) => r.tags.includes(tag)) : (saved ?? []);
 
   return (
-    <ul className="space-y-3 px-4">
-      {saved.map((r) => (
-        <li key={r.place_id} className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-zinc-200 dark:bg-zinc-800">
-            {r.photo_name ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoUrl(r.photo_name)} alt="" className="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div className="flex h-full items-center justify-center text-2xl">🍽️</div>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold">{r.name}</p>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {[r.cuisine && labelOf(r.cuisine), r.rating !== null && `★ ${r.rating.toFixed(1)}`, priceLabel(r.price_level)]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-            {r.address && <p className="truncate text-xs text-zinc-500">{r.address}</p>}
-            <div className="mt-1.5 flex gap-4 text-sm font-medium">
-              <a href={mapsUrl(r)} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline dark:text-sky-400">
-                Directions ↗
-              </a>
-              {r.website && (
-                <a href={r.website} target="_blank" rel="noreferrer" className="text-sky-600 hover:underline dark:text-sky-400">
-                  Website ↗
-                </a>
-              )}
+    <>
+      <header className="flex items-center gap-3 px-4 pb-2 pt-6">
+        <h1 className="flex-1 text-[28px] font-extrabold tracking-tight">Your picks</h1>
+        {saved && saved.length > 0 && (
+          <span className="rounded-full bg-ink px-3 py-1 text-sm font-bold text-card">{saved.length}</span>
+        )}
+      </header>
+
+      {error ? (
+        <p className="px-4 text-danger">{error}</p>
+      ) : !saved ? (
+        <p className="px-4 text-muted">Loading…</p>
+      ) : saved.length === 0 ? (
+        <div className="mx-4 mt-4 rounded-[28px] bg-card px-6 py-10 text-center">
+          <p className="text-muted">Nothing saved yet.</p>
+          <Link href="/swipe" className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 font-semibold text-card">
+            Start swiping
+          </Link>
+        </div>
+      ) : (
+        <>
+          {topTags.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto px-4 pb-3 pt-2 [scrollbar-width:none]">
+              {[null, ...topTags].map((t) => (
+                <button
+                  key={t ?? "all"}
+                  onClick={() => setTag(t)}
+                  aria-pressed={tag === t}
+                  className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
+                    tag === t ? "bg-ink text-card" : "bg-card text-ink hover:bg-soft"
+                  }`}
+                >
+                  {t ? labelOf(t) : "Everything"}
+                </button>
+              ))}
             </div>
-          </div>
-        </li>
-      ))}
-    </ul>
+          )}
+          <ul className="grid grid-cols-2 gap-3 px-4">
+            {shown.map((r, i) => (
+              <li key={r.place_id} className="flex flex-col overflow-hidden rounded-[26px] bg-card">
+                <div className={`relative h-28 ${TINTS[i % TINTS.length]}`}>
+                  {r.photo_name ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoUrl(r.photo_name)} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-muted/60">
+                      <PlateIcon className="h-10 w-10" />
+                    </div>
+                  )}
+                  {r.rating !== null && (
+                    <span className="absolute left-2.5 top-2.5 rounded-full bg-card px-2.5 py-0.5 text-xs font-bold">
+                      ★ {r.rating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col gap-0.5 px-3 pb-3 pt-2.5">
+                  <p className="line-clamp-2 font-bold leading-tight">{r.name}</p>
+                  <p className="text-[13px] font-medium text-muted">
+                    {[r.cuisine && labelOf(r.cuisine), priceLabel(r.price_level)].filter(Boolean).join(" · ")}
+                  </p>
+                  <div className="mt-auto flex gap-3 pt-1.5 text-[13px] font-bold">
+                    <a href={mapsUrl(r)} target="_blank" rel="noreferrer" className="flex min-h-7 items-center gap-0.5 hover:underline">
+                      Directions <ArrowUpRightIcon className="h-3 w-3" />
+                    </a>
+                    {r.website && (
+                      <a href={r.website} target="_blank" rel="noreferrer" className="flex min-h-7 items-center gap-0.5 hover:underline">
+                        Site <ArrowUpRightIcon className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
   );
 }

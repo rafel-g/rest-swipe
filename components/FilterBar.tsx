@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { PinIcon, SlidersIcon } from "./icons";
 import { EMPTY_FILTERS, type FilterOption, type Filters } from "@/lib/client";
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -8,10 +10,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-        active
-          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-          : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-800 dark:hover:bg-zinc-800"
+      className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
+        active ? "bg-ink text-card" : "bg-card text-ink hover:bg-soft"
       }`}
     >
       {children}
@@ -24,11 +24,15 @@ export function FilterBar({
   onChange,
   cuisines,
   tags,
+  location,
+  radiusMi,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
   cuisines: FilterOption[];
   tags: FilterOption[];
+  location: string | null;
+  radiusMi: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const extraCount =
@@ -37,24 +41,45 @@ export function FilterBar({
 
   return (
     <div className="pb-3">
+      <div className="flex items-center gap-2.5 px-4 pb-3">
+        <Link
+          href="/"
+          className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded-full bg-card px-4 font-semibold"
+          aria-label={`Change location (currently ${location ?? "not set"})`}
+        >
+          <PinIcon className="h-[18px] w-[18px] shrink-0" />
+          <span className="truncate">{location ?? "Set your location"}</span>
+          {radiusMi !== null && <span className="ml-auto shrink-0 font-medium text-muted">{radiusMi} mi</span>}
+        </Link>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={extraCount > 0 ? `Filters, ${extraCount} active` : "Filters"}
+          className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-card"
+        >
+          <SlidersIcon className="h-5 w-5" />
+          {extraCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[11px] font-bold text-on-coral">
+              {extraCount}
+            </span>
+          )}
+        </button>
+      </div>
       <div className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-        <Chip active={open || extraCount > 0} onClick={() => setOpen((o) => !o)}>
-          ⚙︎ Filters{extraCount > 0 ? ` (${extraCount})` : ""}
-        </Chip>
         <Chip active={filters.cuisine === null} onClick={() => set({ cuisine: null })}>
           All
         </Chip>
         {cuisines.map((c) => (
           <Chip key={c.value} active={filters.cuisine === c.value} onClick={() => set({ cuisine: c.value })}>
-            {c.label} <span className="opacity-50">{c.count}</span>
+            {c.label} <span className="opacity-60">{c.count}</span>
           </Chip>
         ))}
       </div>
 
       {open && (
-        <div className="mx-4 mt-2 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+        <div className="mx-4 mt-2 space-y-3 rounded-3xl bg-soft p-4">
           <div>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">Max price</p>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Max price</p>
             <div className="flex gap-2">
               {[null, 1, 2, 3, 4].map((p) => (
                 <Chip key={String(p)} active={filters.maxPrice === p} onClick={() => set({ maxPrice: p })}>
@@ -73,7 +98,7 @@ export function FilterBar({
           </div>
           {tags.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">Must have</p>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">Must have</p>
               <div className="flex flex-wrap gap-2">
                 {tags.map((t) => {
                   const active = filters.tags.includes(t.value);
@@ -95,7 +120,7 @@ export function FilterBar({
           {extraCount > 0 && (
             <button
               onClick={() => onChange({ ...EMPTY_FILTERS, cuisine: filters.cuisine })}
-              className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
+              className="text-sm font-semibold underline underline-offset-2"
             >
               Reset filters
             </button>

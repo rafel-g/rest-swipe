@@ -3,11 +3,13 @@
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
 import { useImperativeHandle, useRef, type Ref } from "react";
 import { labelOf, mapsUrl, photoUrl, priceLabel, type Card } from "@/lib/client";
+import { ArrowUpRightIcon, PlateIcon } from "./icons";
 
 export type CardHandle = { fly: (decision: "yes" | "no") => Promise<void> };
 
 const SWIPE_DISTANCE = 110;
 const SWIPE_VELOCITY = 600;
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
 export function RestaurantCard({
   card,
@@ -46,10 +48,11 @@ export function RestaurantCard({
   }
 
   const price = priceLabel(card.price_level);
+  const meta = [card.cuisine && labelOf(card.cuisine), price, `${card.distance_mi.toFixed(1)} mi`].filter(Boolean);
 
   return (
     <motion.article
-      className="absolute inset-0 flex select-none flex-col overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10"
+      className="absolute inset-0 flex select-none flex-col overflow-hidden rounded-[36px] bg-card shadow-[0_10px_30px_-12px_rgba(14,59,46,0.35)]"
       style={{ x, rotate, touchAction: isTop ? "none" : "auto", zIndex: 10 - depth }}
       initial={false}
       animate={{ scale: 1 - depth * 0.04, y: depth * 12 }}
@@ -58,7 +61,7 @@ export function RestaurantCard({
       onDragEnd={onDragEnd}
       aria-hidden={!isTop}
     >
-      <div className="relative h-[55%] shrink-0 bg-zinc-200 dark:bg-zinc-800">
+      <div className="relative h-[46%] shrink-0 bg-peach">
         {card.photo_name ? (
           // Plain img: the proxy already sizes and caches the photo.
           // eslint-disable-next-line @next/next/no-img-element
@@ -70,69 +73,58 @@ export function RestaurantCard({
             loading={depth === 0 ? "eager" : "lazy"}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-6xl">🍽️</div>
+          <div className="flex h-full items-center justify-center text-muted/60">
+            <PlateIcon className="h-20 w-20" />
+          </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
-        {card.cuisine && (
-          <span className="absolute bottom-3 left-4 rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-zinc-900">
-            {labelOf(card.cuisine)}
+        <a
+          href={mapsUrl(card)}
+          target="_blank"
+          rel="noreferrer"
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute right-4 top-4 flex min-h-9 items-center gap-1 rounded-full bg-card/95 px-3.5 text-sm font-semibold text-ink"
+        >
+          Map <ArrowUpRightIcon className="h-3.5 w-3.5" />
+        </a>
+        {card.rating !== null && (
+          <span
+            className="absolute -bottom-7 left-5 flex h-16 w-16 flex-col items-center justify-center rounded-full bg-ink leading-none text-card ring-4 ring-card"
+            aria-label={`Rated ${card.rating.toFixed(1)} from ${card.rating_count.toLocaleString()} reviews`}
+          >
+            <span className="text-xl font-extrabold">{card.rating.toFixed(1)}</span>
+            <span className="mt-0.5 text-[10px] font-medium">★ {compact.format(card.rating_count)}</span>
           </span>
         )}
         <motion.span
           style={{ opacity: yesOpacity }}
-          className="absolute left-5 top-5 -rotate-12 rounded-lg border-4 border-emerald-500 px-3 py-1 text-3xl font-black tracking-wider text-emerald-500"
+          className="absolute left-5 top-6 -rotate-12 rounded-2xl border-[3px] border-on-coral bg-coral px-4 py-1.5 text-2xl font-extrabold tracking-wide text-on-coral"
         >
-          YES
+          YUM!
         </motion.span>
         <motion.span
           style={{ opacity: noOpacity }}
-          className="absolute right-5 top-5 rotate-12 rounded-lg border-4 border-rose-500 px-3 py-1 text-3xl font-black tracking-wider text-rose-500"
+          className="absolute right-5 top-16 rotate-12 rounded-2xl border-[3px] border-ink bg-card px-4 py-1.5 text-2xl font-extrabold tracking-wide text-ink"
         >
-          NOPE
+          NAH
         </motion.span>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-xl font-bold leading-tight text-zinc-900 dark:text-zinc-50">{card.name}</h2>
-          <a
-            href={mapsUrl(card)}
-            target="_blank"
-            rel="noreferrer"
-            onPointerDown={(e) => e.stopPropagation()}
-            className="shrink-0 text-sm font-medium text-sky-600 hover:underline dark:text-sky-400"
-          >
-            Map ↗
-          </a>
-        </div>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {card.rating !== null ? (
-            <>
-              <span className="font-semibold text-amber-500">★ {card.rating.toFixed(1)}</span>{" "}
-              ({card.rating_count.toLocaleString()})
-            </>
-          ) : (
-            "No ratings yet"
-          )}
-          {price && <> · {price}</>}
-          {" · "}
-          {card.distance_mi.toFixed(1)} mi
+      <div className={`flex min-h-0 flex-1 flex-col gap-2 px-5 pb-5 ${card.rating !== null ? "pt-9" : "pt-5"}`}>
+        <p className="text-sm font-semibold text-muted">
+          {meta.join(" · ")}
+          {card.rating === null && " · No ratings yet"}
         </p>
+        <h2 className="text-[28px] font-extrabold leading-[1.05] tracking-tight">{card.name}</h2>
         {card.reasons.length > 0 && (
-          <p
-            className={`text-sm font-medium ${card.explore ? "text-violet-600 dark:text-violet-400" : "text-emerald-700 dark:text-emerald-400"}`}
-          >
-            {card.explore ? "✨ " : "♥ "}
+          <p className={`rounded-2xl px-3 py-2 text-sm font-medium ${card.explore ? "bg-peach" : "bg-soft"}`}>
+            {card.explore ? "Something new: " : "Picked for you: "}
             {card.reasons.join(" · ")}
           </p>
         )}
-        {card.summary && <p className="line-clamp-3 text-sm text-zinc-700 dark:text-zinc-300">{card.summary}</p>}
-        <div className="mt-auto flex flex-wrap gap-1.5 overflow-hidden">
+        {card.summary && <p className="line-clamp-2 text-sm text-muted">{card.summary}</p>}
+        <div className="mt-auto flex max-h-[28px] flex-wrap gap-1.5 overflow-hidden">
           {card.tags.map((t) => (
-            <span
-              key={t}
-              className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-            >
+            <span key={t} className="rounded-full bg-peach px-3 py-1 text-[13px] font-semibold">
               {labelOf(t)}
             </span>
           ))}
