@@ -3,6 +3,8 @@
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
 import { useImperativeHandle, useRef, type Ref } from "react";
 import { labelOf, mapsUrl, photoUrl, priceLabel, type Card } from "@/lib/client";
+import { namesLabel, type Friend } from "@/lib/friends";
+import { AvatarStack } from "./Avatars";
 import { ArrowUpRightIcon, PlateIcon } from "./icons";
 
 export type CardHandle = { fly: (decision: "yes" | "no") => Promise<void> };
@@ -15,12 +17,14 @@ export function RestaurantCard({
   card,
   isTop,
   depth,
+  likedBy = [],
   onDecision,
   ref,
 }: {
   card: Card;
   isTop: boolean;
   depth: number;
+  likedBy?: Friend[];
   onDecision: (decision: "yes" | "no") => void;
   ref?: Ref<CardHandle>;
 }) {
@@ -89,6 +93,12 @@ export function RestaurantCard({
           >
             Map <ArrowUpRightIcon className="h-3.5 w-3.5" />
           </a>
+          {likedBy.length > 0 && (
+            <span className="absolute bottom-3 right-4 flex min-h-9 items-center gap-2 rounded-full bg-card/95 py-1 pl-1.5 pr-3.5 text-sm font-semibold text-ink">
+              <AvatarStack friends={likedBy} />
+              {namesLabel(likedBy)} liked this
+            </span>
+          )}
           {card.rating !== null && (
             <span
               className="absolute -bottom-7 left-5 flex h-16 w-16 flex-col items-center justify-center rounded-full bg-ink leading-none text-card ring-4 ring-card"

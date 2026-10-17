@@ -183,9 +183,10 @@ describe("setup profile", () => {
     expect(ranked[0].place_id).toBe("b");
   });
 
-  it("matches diets by tag or cuisine and requires every restriction", () => {
+  it("matches diets by tag only and requires every restriction", () => {
     expect(fitsDietary({ cuisine: "thai", tags: ["vegan-options"] }, ["vegan"])).toBe(true);
-    expect(fitsDietary({ cuisine: "vegetarian", tags: [] }, ["vegetarian"])).toBe(true);
+    expect(fitsDietary({ cuisine: "thai", tags: ["vegetarian-friendly"] }, ["vegetarian"])).toBe(true);
+    expect(fitsDietary({ cuisine: "vegetarian", tags: [] }, ["vegetarian"])).toBe(false);
     expect(fitsDietary({ cuisine: "thai", tags: ["vegetarian-friendly"] }, ["vegan"])).toBe(false);
     expect(fitsDietary({ cuisine: "thai", tags: ["vegan-options"] }, ["vegan", "gluten-free"])).toBe(false);
   });

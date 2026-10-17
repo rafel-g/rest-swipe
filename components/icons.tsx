@@ -77,3 +77,17 @@ export const ChevronDownIcon = ({ className }: Props) => (
     <path d="M6 9l6 6 6-6" />
   </svg>
 );
+
+export const UsersIcon = ({ className }: Props) => (
+  <svg {...base} strokeWidth={2} className={className}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0113 0" />
+    <path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.2a6.5 6.5 0 013.5 5.8" />
+  </svg>
+);
+
+export const PlusIcon = ({ className }: Props) => (
+  <svg {...base} strokeWidth={2.6} className={className}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);

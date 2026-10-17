@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RestaurantCard, type CardHandle } from "./RestaurantCard";
 import { FilterBar } from "./FilterBar";
+import { MatchOverlay, type Match } from "./MatchOverlay";
 import { HeartIcon, UndoIcon, XIcon } from "./icons";
 import { api, ApiError, EMPTY_FILTERS, type Card, type FilterOption, type Filters } from "@/lib/client";
+import { DEMO_MATCH_AT, demoMatchFriend, likedBy, useFriends } from "@/lib/friends";
 
 const PAGE_SIZE = 10;
 const REFILL_AT = 3;
@@ -38,6 +40,12 @@ export function SwipeDeck() {
   const [exhausted, setExhausted] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [history, setHistory] = useState<Card[]>([]);
+  const friends = useFriends();
+  const [match, setMatch] = useState<Match | null>(null);
+  const clearMatch = useCallback(() => setMatch(null), []);
+  // Demo: count swipes this visit so a match is guaranteed early on (see DEMO_MATCH_AT).
+  const swipeCount = useRef(0);
+  const matched = useRef(false);
 
   const topRef = useRef<CardHandle>(null);
   // Swipes are sent one at a time so preference updates never race each other,
@@ -112,6 +120,15 @@ export function SwipeDeck() {
       swipedIds.current.add(card.place_id);
       setCards((prev) => prev.filter((c) => c.place_id !== card.place_id));
       setHistory((h) => [...h.slice(-19), card]);
+      swipeCount.current++;
+      if (decision === "yes") {
+        let fans = likedBy(friends, card.place_id);
+        if (fans.length === 0 && !matched.current && swipeCount.current >= DEMO_MATCH_AT) fans = [demoMatchFriend(friends)];
+        if (fans.length > 0) {
+          matched.current = true;
+          setMatch({ id: Date.now(), card, with: fans });
+        }
+      }
       const cuisineFilter = filtersRef.current.cuisine;
       pending.current = pending.current.then(() =>
         api("/api/swipe", {
@@ -121,7 +138,7 @@ export function SwipeDeck() {
       );
       if (!exhausted && cards.length - 1 <= REFILL_AT) void loadMore(cards.length - 1);
     },
-    [cards.length, exhausted, loadMore],
+    [cards.length, exhausted, friends, loadMore],
   );
 
   const undo = useCallback(async () => {
@@ -183,10 +200,13 @@ export function SwipeDeck() {
               card={card}
               isTop={i === 0}
               depth={i}
+              likedBy={likedBy(friends, card.place_id)}
               onDecision={(d) => decide(card, d)}
             />
           ))
           .reverse()}
+
+        <MatchOverlay match={match} onDone={clearMatch} />
 
         {!top && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-[36px] bg-card p-6 text-center">

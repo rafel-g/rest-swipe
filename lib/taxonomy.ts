@@ -28,7 +28,6 @@ export const CUISINES = [
   "caribbean",
   "seafood",
   "steakhouse",
-  "vegetarian",
   "breakfast-brunch",
   "cafe-bakery",
   "dessert",
@@ -63,10 +62,13 @@ export const TAGS = [
   "chain",
 ] as const;
 
-/** Dietary restrictions offered at setup, and the cuisine or tags that count as a match. */
+/**
+ * Dietary restrictions offered at setup, and the cuisine or tags that count as a match.
+ * These are separate from cuisines: a Thai place can still be vegan, so diets match on tags.
+ */
 export const DIETARY = {
-  vegetarian: { cuisines: ["vegetarian"], tags: ["vegetarian-friendly", "vegan-options"] },
-  vegan: { cuisines: ["vegetarian"], tags: ["vegan-options"] },
+  vegetarian: { cuisines: [], tags: ["vegetarian-friendly", "vegan-options"] },
+  vegan: { cuisines: [], tags: ["vegan-options"] },
   "gluten-free": { cuisines: [], tags: ["gluten-free-options"] },
 } as const satisfies Record<string, { cuisines: readonly Cuisine[]; tags: readonly Tag[] }>;
 
@@ -105,8 +107,6 @@ export const GOOGLE_TYPE_TO_CUISINE: Record<string, Cuisine> = {
   african_restaurant: "african",
   seafood_restaurant: "seafood",
   steak_house: "steakhouse",
-  vegetarian_restaurant: "vegetarian",
-  vegan_restaurant: "vegetarian",
   breakfast_restaurant: "breakfast-brunch",
   brunch_restaurant: "breakfast-brunch",
   cafe: "cafe-bakery",
