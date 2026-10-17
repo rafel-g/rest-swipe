@@ -203,7 +203,7 @@ export function SetupForm() {
                   onClick={() => setDietary(active ? dietary.filter((x) => x !== d) : [...dietary, d])}
                   aria-pressed={active}
                   className={`min-h-10 rounded-full px-4 text-sm font-semibold transition ${
-                    active ? "bg-ink text-card" : "bg-soft text-ink hover:bg-line"
+                    active ? "bg-ink text-card" : "bg-soft text-ink hover:bg-sage-2"
                   }`}
                 >
                   {label(d)}

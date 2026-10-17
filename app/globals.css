@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-/* Greenmarket palette: mint ground, deep-green ink, coral and peach accents. */
+/* Greenmarket palette: mint ground, deep-green ink, coral and peach accents.
+   Always light: the pastels are the look, even when the device is in dark mode. */
 :root {
+  color-scheme: light;
   --ground: #dfeee3;
   --card: #ffffff;
   --ink: #0e3b2e;
@@ -15,22 +17,6 @@
   --on-coral: #0e3b2e;
   --good: #1f7a4d;
   --danger: #b3261e;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0d211b;
-    --card: #15312a;
-    --ink: #e4f1e8;
-    --muted: #9ec4b3;
-    --soft: #1c3f35;
-    --peach: #3a2f27;
-    --sage: #1a3b31;
-    --sage-2: #21463b;
-    --line: #2a5045;
-    --good: #6fd4a0;
-    --danger: #ff8a80;
-  }
 }
 
 @theme inline {

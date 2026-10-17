@@ -25,7 +25,7 @@ export function CuisinePicker({ value, onChange }: { value: string[]; onChange: 
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full items-center rounded-2xl border-2 border-line bg-soft px-4 py-3 text-left focus:border-ink"
+        className="flex w-full items-center rounded-2xl border-2 border-line bg-soft px-4 py-3 text-left outline-none focus:border-ink"
       >
         <span className={`truncate ${value.length === 0 ? "text-muted" : ""}`}>{summary}</span>
         <ChevronDownIcon className={`ml-auto h-5 w-5 shrink-0 transition ${open ? "rotate-180" : ""}`} />
@@ -42,7 +42,7 @@ export function CuisinePicker({ value, onChange }: { value: string[]; onChange: 
                   onClick={() => toggle(c)}
                   aria-pressed={active}
                   className={`min-h-10 rounded-full px-4 text-sm font-semibold transition ${
-                    active ? "bg-ink text-card" : "bg-card text-ink hover:bg-line"
+                    active ? "bg-ink text-card" : "bg-card text-ink hover:bg-sage-2"
                   }`}
                 >
                   {label(c)}
