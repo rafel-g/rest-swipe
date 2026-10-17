@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyFilter,
+  brandKey,
+  closestPerBrand,
   featuresOf,
   fitsDietary,
   isOpenAt,
@@ -196,5 +198,41 @@ describe("setup profile", () => {
     const ranked = rankCandidates(cands, {}, { ...noExplore, dietary: ["vegetarian"] });
     expect(ranked.map((c) => c.place_id)).toEqual(["veg", "steak"]);
     expect(ranked[0].reasons[0]).toBe("Fits vegetarian");
+  });
+});
+
+describe("brands with several locations", () => {
+  it("groups locations by website even when names differ", () => {
+    expect(brandKey({ name: "Pizza Lucé Hopkins", website: "https://www.pizzaluce.com/hopkins" })).toBe(
+      brandKey({ name: "Pizza Lucé St Paul", website: "http://pizzaluce.com/" }),
+    );
+  });
+
+  it("keeps a group's different concepts on one website apart", () => {
+    const site = "https://bloomingtonchophouse.com";
+    expect(brandKey({ name: "Bloomington ChopHouse", website: site })).not.toBe(brandKey({ name: "Olive Lounge", website: site }));
+    expect(brandKey({ name: "Luckys 13 Pub", website: "https://luckys13pub.com" })).toBe(
+      brandKey({ name: "Lucky's 13 Pub Roseville", website: "https://luckys13pub.com" }),
+    );
+    expect(brandKey({ name: "Tipsy Steer Roseville", website: "https://tipsysteer.com" })).toBe(
+      brandKey({ name: "The Tipsy Steer Hiawatha", website: "https://tipsysteer.com" }),
+    );
+  });
+
+  it("ignores shared hosts like facebook and falls back to the name", () => {
+    const a = brandKey({ name: "Roman's Cafe", website: "https://facebook.com/romans" });
+    const b = brandKey({ name: "Sabor Latino", website: "https://www.facebook.com/sabor" });
+    expect(a).not.toBe(b);
+    expect(brandKey({ name: "Lucky's 13 Pub", website: null })).toBe(brandKey({ name: "lucky’s 13 pub", website: null }));
+  });
+
+  it("keeps only the closest location", () => {
+    const site = "https://pizzaluce.com";
+    const kept = closestPerBrand([
+      { ...place({ place_id: "far", name: "Pizza Lucé Roseville", distance_mi: 9 }), website: site },
+      { ...place({ place_id: "near", name: "Pizza Lucé Richfield", distance_mi: 2 }), website: site },
+      { ...place({ place_id: "other", distance_mi: 5 }), website: "https://punchpizza.com" },
+    ]);
+    expect(kept.map((c) => c.place_id).sort()).toEqual(["near", "other"]);
   });
 });

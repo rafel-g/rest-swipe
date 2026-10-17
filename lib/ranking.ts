@@ -126,6 +126,63 @@ export function isOpenAt(hours: OpeningPeriod[] | null, utcOffsetMin: number | n
   });
 }
 
+// Hosts many unrelated restaurants share, so they say nothing about which brand a place is.
+const SHARED_HOSTS = new Set([
+  "facebook.com",
+  "instagram.com",
+  "linktr.ee",
+  "google.com",
+  "sites.google.com",
+  "business.site",
+  "square.site",
+  "toasttab.com",
+  "order.toasttab.com",
+  "clover.com",
+  "yelp.com",
+  "doordash.com",
+  "ubereats.com",
+  "grubhub.com",
+  "wixsite.com",
+  "ihg.com",
+]);
+
+/**
+ * Identifies a restaurant across its locations. Locations of one brand nearly always share a
+ * website, while their names vary ("Pizza Lucé Hopkins", "Pizza Lucé St Paul"). The name's first
+ * word is part of the key so a restaurant group's different concepts on one site stay apart
+ * ("Bloomington ChopHouse" vs "Olive Lounge"). Without a usable website, the whole name is the key.
+ */
+export function brandKey(r: { name: string; website: string | null }): string {
+  const words = r.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/['’]/g, "") // "Lucky's" and "Luckys" are the same word
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  if (r.website) {
+    try {
+      const host = new URL(r.website).hostname.toLowerCase().replace(/^www\./, "");
+      const first = words.find((w) => w !== "the") ?? "";
+      if (!SHARED_HOSTS.has(host)) return `site:${host}:${first}`;
+    } catch {
+      // Malformed URL: use the name.
+    }
+  }
+  return `name:${words.join(" ")}`;
+}
+
+/** One location per brand, the closest, so the deck never shows the same restaurant twice. */
+export function closestPerBrand<C extends Candidate & { website: string | null }>(cands: C[]): C[] {
+  const best = new Map<string, C>();
+  for (const c of cands) {
+    const key = brandKey(c);
+    const current = best.get(key);
+    if (!current || c.distance_mi < current.distance_mi) best.set(key, c);
+  }
+  return [...best.values()];
+}
+
 /** Hard filters applied before scoring. Places with unknown hours are dropped when openNow is set. */
 export function applyFilter<C extends Candidate>(cands: C[], filter: DeckFilter, now = new Date()): C[] {
   return cands.filter((c) => {

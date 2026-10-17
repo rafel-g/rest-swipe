@@ -3,6 +3,8 @@ import { metersToMiles, milesToMeters } from "./geo";
 import { latestSearch } from "./jobs";
 import {
   applyFilter,
+  brandKey,
+  closestPerBrand,
   EXPLORE_RATE,
   rankCandidates,
   updateWeights,
@@ -38,11 +40,26 @@ const PAGE = 1000; // PostgREST returns at most 1000 rows per request
 /** The app is for local spots: anything the tagger marked as a chain never reaches the deck. */
 const HIDDEN_TAG = "chain";
 
-/** All unswiped, non-chain restaurants around the active search origin, with distance in miles. */
+/** Brands already swiped on any location: "yes" ones always, "no" ones unless passed places are shown again. */
+async function swipedBrands(includePassed: boolean) {
+  const { data, error } = await db().from("swipes").select("decision, restaurants(name,website)");
+  if (error) throw new Error(error.message);
+  const brands = new Set<string>();
+  for (const s of data ?? []) {
+    const place = s.restaurants as unknown as { name: string; website: string | null } | null;
+    if (place && (s.decision === "yes" || !includePassed)) brands.add(brandKey(place));
+  }
+  return brands;
+}
+
+/**
+ * Unswiped, non-chain restaurants around the active search origin, with distance in miles.
+ * Multi-location brands appear once (closest location), and not at all once any location was swiped.
+ */
 export async function loadCandidates(opts: { cuisine?: string | null; includePassed?: boolean } = {}) {
-  const search = await latestSearch();
+  const [search, swiped] = await Promise.all([latestSearch(), swipedBrands(opts.includePassed ?? false)]);
   if (!search) throw new NoSearchError();
-  const rows: DeckRow[] = [];
+  const all: DeckRow[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db()
       .rpc("deck_candidates", {
@@ -57,10 +74,11 @@ export async function loadCandidates(opts: { cuisine?: string | null; includePas
     for (const r of data ?? []) {
       const tags: string[] = r.tags ?? [];
       if (tags.includes(HIDDEN_TAG)) continue;
-      rows.push({ ...r, tags, distance_mi: metersToMiles(r.distance_m) });
+      all.push({ ...r, tags, distance_mi: metersToMiles(r.distance_m) });
     }
     if (!data || data.length < PAGE) break;
   }
+  const rows = closestPerBrand(all.filter((r) => !swiped.has(brandKey(r))));
   return { search, rows };
 }
 
