@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { db } from "./supabase";
-import { CUISINES, TAGS, cuisineFromGoogleTypes, priceTag, type Cuisine, type Tag } from "./taxonomy";
+import { CUISINES, TAGS, cuisineFromGoogleTypes, isCuisine, isTag, priceTag, type Cuisine, type Tag } from "./taxonomy";
 
 export const TAGGING_MODEL = "claude-haiku-5-5";
 const BATCH_SIZE = 20;
@@ -23,12 +23,14 @@ export type TagInput = {
 
 export type TagResult = { place_id: string; cuisine: Cuisine; tags: Tag[] };
 
+// Strings, not enums: the SDK throws on any out-of-list value, which would discard the whole
+// batch. Unknown values are filtered in classifyBatch instead.
 const OutputSchema = z.object({
   results: z.array(
     z.object({
       place_id: z.string(),
-      cuisine: z.enum(CUISINES),
-      tags: z.array(z.enum(TAGS)),
+      cuisine: z.string(),
+      tags: z.array(z.string()),
     }),
   ),
 });
@@ -89,9 +91,12 @@ export async function classifyBatch(batch: TagInput[]): Promise<TagResult[]> {
       if (!input) continue;
       const derived = priceTag(input.price_level);
       // Price comes from Google's data, not the model's guess.
-      const modelTags = r.tags.filter((t) => !["cheap-eats", "mid-range", "upscale"].includes(t));
+      const modelTags = r.tags.filter(isTag).filter((t) => !["cheap-eats", "mid-range", "upscale"].includes(t));
       const tags = [...new Set([...(derived ? [derived] : []), ...modelTags])].slice(0, MAX_TAGS);
-      results.push({ place_id: r.place_id, cuisine: r.cuisine, tags });
+      const cuisine = isCuisine(r.cuisine)
+        ? r.cuisine
+        : (cuisineFromGoogleTypes(input.primary_type, input.google_types) ?? "other");
+      results.push({ place_id: r.place_id, cuisine, tags });
     }
     return results;
   }

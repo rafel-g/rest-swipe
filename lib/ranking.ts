@@ -1,5 +1,5 @@
 import type { OpeningPeriod } from "./places";
-import { label } from "./taxonomy";
+import { DIETARY, isDietary, label } from "./taxonomy";
 
 /** A restaurant as the ranking engine sees it. */
 export type Candidate = {
@@ -27,6 +27,9 @@ export type DeckFilter = {
 
 export type Ranked<C extends Candidate> = C & { score: number; reasons: string[]; explore: boolean };
 
+/** What the user picked at setup. */
+export type Profile = { cuisines: string[]; dietary: string[] };
+
 // Score = quality + distance + learned affinity. Kept in one place so they are easy to tune.
 export const SCORE_WEIGHTS = { quality: 0.5, distance: 0.15, affinity: 0.35 };
 /** Bayesian prior strength: a place needs about this many reviews before its own rating dominates. */
@@ -35,6 +38,12 @@ export const LEARNING_RATE = 0.3;
 export const WEIGHT_LIMIT = 3;
 export const EXPLORE_RATE = 0.1;
 const DEFAULT_MEAN_RATING = 4.2;
+/** Head start for cuisines picked at setup, on the same scale as learned weights (one "yes" is LEARNING_RATE). */
+export const PROFILE_CUISINE_WEIGHT = 1;
+/** Score bonus for places that fit every dietary restriction: strong enough to rank them first, not a filter. */
+export const DIETARY_BONUS = 0.3;
+/** Swipes after setup that only show picked cuisines, before learned ranking takes over. */
+export const WARMUP_SWIPES = 5;
 
 // Price tags duplicate the price feature, so they don't count twice.
 const PRICE_TAGS = new Set(["cheap-eats", "mid-range", "upscale"]);
@@ -65,12 +74,37 @@ export function affinityScore(c: Candidate, weights: Weights): number {
   return (Math.tanh(raw / 2) + 1) / 2;
 }
 
-export function scoreCandidate(c: Candidate, weights: Weights, meanRating: number, maxDistMi: number): number {
+/** Learned weights plus the setup head start. Kept separate in storage so swipes and undo stay exact. */
+export function withProfile(weights: Weights, profile: Profile): Weights {
+  const merged = { ...weights };
+  for (const c of profile.cuisines) merged[`cuisine:${c}`] = (merged[`cuisine:${c}`] ?? 0) + PROFILE_CUISINE_WEIGHT;
+  return merged;
+}
+
+/** Whether a place fits every dietary restriction, judged from its cuisine and tags. */
+export function fitsDietary(c: Pick<Candidate, "cuisine" | "tags">, dietary: string[]): boolean {
+  return dietary.filter(isDietary).every((d) => {
+    const match = DIETARY[d];
+    return (
+      (c.cuisine !== null && (match.cuisines as readonly string[]).includes(c.cuisine)) ||
+      match.tags.some((t) => c.tags.includes(t))
+    );
+  });
+}
+
+export function scoreCandidate(
+  c: Candidate,
+  weights: Weights,
+  meanRating: number,
+  maxDistMi: number,
+  dietary: string[] = [],
+): number {
   const distance = 1 - clamp(c.distance_mi / Math.max(maxDistMi, 0.1), 0, 1);
   return (
     SCORE_WEIGHTS.quality * qualityScore(c, meanRating) +
     SCORE_WEIGHTS.distance * distance +
-    SCORE_WEIGHTS.affinity * affinityScore(c, weights)
+    SCORE_WEIGHTS.affinity * affinityScore(c, weights) +
+    (dietary.length > 0 && fitsDietary(c, dietary) ? DIETARY_BONUS : 0)
   );
 }
 
@@ -103,8 +137,9 @@ export function applyFilter<C extends Candidate>(cands: C[], filter: DeckFilter,
   });
 }
 
-function reasonsFor(c: Candidate, weights: Weights): string[] {
-  return featuresOf(c)
+function reasonsFor(c: Candidate, weights: Weights, dietary: string[]): string[] {
+  const diet = dietary.length > 0 && fitsDietary(c, dietary) ? [`Fits ${dietary.map(label).join(", ").toLowerCase()}`] : [];
+  const liked = featuresOf(c)
     .map((f) => ({ f, w: weights[f] ?? 0 }))
     .filter(({ w }) => w >= 0.5)
     .sort((a, b) => b.w - a.w)
@@ -115,6 +150,7 @@ function reasonsFor(c: Candidate, weights: Weights): string[] {
       if (kind === "tag") return `You like ${label(value).toLowerCase()}`;
       return `You like ${label(value)}`;
     });
+  return [...diet, ...liked].slice(0, 2);
 }
 
 /**
@@ -125,18 +161,19 @@ function reasonsFor(c: Candidate, weights: Weights): string[] {
 export function rankCandidates<C extends Candidate>(
   cands: C[],
   weights: Weights,
-  opts: { limit: number; maxDistMi: number; exploreRate?: number; rng?: () => number },
+  opts: { limit: number; maxDistMi: number; exploreRate?: number; dietary?: string[]; rng?: () => number },
 ): Ranked<C>[] {
   const rated = cands.filter((c) => c.rating !== null);
   const meanRating = rated.length
     ? rated.reduce((s, c) => s + (c.rating as number), 0) / rated.length
     : DEFAULT_MEAN_RATING;
 
+  const dietary = opts.dietary ?? [];
   const sorted = cands
     .map((c) => ({
       ...c,
-      score: scoreCandidate(c, weights, meanRating, opts.maxDistMi),
-      reasons: reasonsFor(c, weights),
+      score: scoreCandidate(c, weights, meanRating, opts.maxDistMi, dietary),
+      reasons: reasonsFor(c, weights, dietary),
       explore: false,
     }))
     .sort((a, b) => b.score - a.score || a.place_id.localeCompare(b.place_id));

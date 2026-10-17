@@ -63,11 +63,20 @@ export const TAGS = [
   "chain",
 ] as const;
 
+/** Dietary restrictions offered at setup, and the cuisine or tags that count as a match. */
+export const DIETARY = {
+  vegetarian: { cuisines: ["vegetarian"], tags: ["vegetarian-friendly", "vegan-options"] },
+  vegan: { cuisines: ["vegetarian"], tags: ["vegan-options"] },
+  "gluten-free": { cuisines: [], tags: ["gluten-free-options"] },
+} as const satisfies Record<string, { cuisines: readonly Cuisine[]; tags: readonly Tag[] }>;
+
 export type Cuisine = (typeof CUISINES)[number];
 export type Tag = (typeof TAGS)[number];
+export type Dietary = keyof typeof DIETARY;
 
 export const isCuisine = (v: unknown): v is Cuisine => CUISINES.includes(v as Cuisine);
 export const isTag = (v: unknown): v is Tag => TAGS.includes(v as Tag);
+export const isDietary = (v: unknown): v is Dietary => typeof v === "string" && Object.hasOwn(DIETARY, v);
 
 /** Google Places primary/secondary types that pin down a cuisine without an LLM. */
 export const GOOGLE_TYPE_TO_CUISINE: Record<string, Cuisine> = {

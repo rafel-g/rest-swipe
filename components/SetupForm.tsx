@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
+import { DIETARY, label } from "@/lib/taxonomy";
+import { CuisinePicker } from "./CuisinePicker";
 import { PinIcon } from "./icons";
 
 type Search = {
@@ -36,8 +37,9 @@ export function SetupForm() {
   const router = useRouter();
   const [address, setAddress] = useState("");
   const [radius, setRadius] = useState(25);
-  const [force, setForce] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [cuisines, setCuisines] = useState<string[]>([]);
+  const [dietary, setDietary] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [current, setCurrent] = useState<Search | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -51,6 +53,12 @@ export function SetupForm() {
         if (search && (search.status === "fetching" || search.status === "tagging" || search.status === "pending")) {
           setActiveId(search.id);
         }
+      })
+      .catch((e) => setError(e.message));
+    api<{ cuisines: string[]; dietary: string[] }>("/api/profile")
+      .then((p) => {
+        setCuisines(p.cuisines);
+        setDietary(p.dietary);
       })
       .catch((e) => setError(e.message));
   }, []);
@@ -90,12 +98,24 @@ export function SetupForm() {
     );
   }
 
+  const saveProfile = () => api("/api/profile", { method: "PUT", body: JSON.stringify({ cuisines, dietary }) });
+
+  async function startSwiping() {
+    try {
+      await saveProfile();
+      router.push("/swipe");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const body = coords && !address ? { ...coords, radiusMi: radius, force } : { address, radiusMi: radius, force };
+      await saveProfile();
+      const body = coords && !address ? { ...coords, radiusMi: radius } : { address, radiusMi: radius };
       const res = await api<StartResponse>("/api/search", { method: "POST", body: JSON.stringify(body) });
       if (res.reused) {
         router.push("/swipe");
@@ -166,10 +186,35 @@ export function SetupForm() {
           />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-muted">
-          <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
-          Re-fetch from Google even if this area was searched recently
-        </label>
+        <div>
+          <p className="mb-1.5 text-sm font-semibold">Cuisines you like</p>
+          <CuisinePicker value={cuisines} onChange={setCuisines} />
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-sm font-semibold">Dietary needs</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.keys(DIETARY).map((d) => {
+              const active = dietary.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDietary(active ? dietary.filter((x) => x !== d) : [...dietary, d])}
+                  aria-pressed={active}
+                  className={`min-h-10 rounded-full px-4 text-sm font-semibold transition ${
+                    active ? "bg-ink text-card" : "bg-soft text-ink hover:bg-line"
+                  }`}
+                >
+                  {label(d)}
+                </button>
+              );
+            })}
+          </div>
+          {dietary.length > 0 && (
+            <p className="mt-1.5 text-xs text-muted">Places that fit are shown first. Check menus — not every listing says.</p>
+          )}
+        </div>
 
         <button
           type="submit"
@@ -178,9 +223,6 @@ export function SetupForm() {
         >
           {submitting ? "Starting…" : "Find restaurants"}
         </button>
-        <p className="text-xs text-muted">
-          A search makes at most 60 Google Places calls (about $2). Searching inside an area covered in the last 30 days is free.
-        </p>
       </form>
 
       {error && <p className="rounded-2xl bg-peach px-4 py-3 text-sm font-medium text-danger">{error}</p>}
@@ -210,12 +252,13 @@ export function SetupForm() {
           {current.status === "done" && (
             <>
               {current.error && <p className="mt-3 text-xs text-muted">{current.error}</p>}
-              <Link
-                href="/swipe"
-                className="mt-4 block rounded-full bg-ink py-3 text-center font-semibold text-card"
+              <button
+                type="button"
+                onClick={startSwiping}
+                className="mt-4 block w-full rounded-full bg-ink py-3 text-center font-semibold text-card"
               >
                 Start swiping →
-              </Link>
+              </button>
             </>
           )}
         </section>

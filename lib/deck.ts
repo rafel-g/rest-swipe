@@ -6,9 +6,12 @@ import {
   EXPLORE_RATE,
   rankCandidates,
   updateWeights,
+  WARMUP_SWIPES,
+  withProfile,
   type Candidate,
   type Decision,
   type DeckFilter,
+  type Profile,
   type Weights,
 } from "./ranking";
 import { db } from "./supabase";
@@ -32,7 +35,10 @@ export class NoSearchError extends Error {
 
 const PAGE = 1000; // PostgREST returns at most 1000 rows per request
 
-/** All unswiped restaurants around the active search origin, with distance in miles. */
+/** The app is for local spots: anything the tagger marked as a chain never reaches the deck. */
+const HIDDEN_TAG = "chain";
+
+/** All unswiped, non-chain restaurants around the active search origin, with distance in miles. */
 export async function loadCandidates(opts: { cuisine?: string | null; includePassed?: boolean } = {}) {
   const search = await latestSearch();
   if (!search) throw new NoSearchError();
@@ -48,7 +54,11 @@ export async function loadCandidates(opts: { cuisine?: string | null; includePas
       })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
-    for (const r of data ?? []) rows.push({ ...r, tags: r.tags ?? [], distance_mi: metersToMiles(r.distance_m) });
+    for (const r of data ?? []) {
+      const tags: string[] = r.tags ?? [];
+      if (tags.includes(HIDDEN_TAG)) continue;
+      rows.push({ ...r, tags, distance_mi: metersToMiles(r.distance_m) });
+    }
     if (!data || data.length < PAGE) break;
   }
   return { search, rows };
@@ -60,20 +70,53 @@ export async function loadWeights(): Promise<Weights> {
   return Object.fromEntries((data ?? []).map((r) => [r.feature, r.weight]));
 }
 
+export async function loadProfile(): Promise<Profile & { updated_at: string | null }> {
+  const { data, error } = await db().from("user_profile").select("cuisines,dietary,updated_at").maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ?? { cuisines: [], dietary: [], updated_at: null };
+}
+
+export async function saveProfile(profile: Profile) {
+  const { error } = await db()
+    .from("user_profile")
+    .upsert({ id: true, ...profile, updated_at: new Date().toISOString() }, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+}
+
+async function swipesSince(since: string | null) {
+  let query = db().from("swipes").select("id", { count: "exact", head: true });
+  if (since) query = query.gte("created_at", since);
+  const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export async function getDeck(
   params: DeckFilter & { cuisine?: string | null; includePassed?: boolean; limit?: number },
 ) {
-  const [{ search, rows }, weights] = await Promise.all([
+  const [{ search, rows }, weights, profile] = await Promise.all([
     loadCandidates({ cuisine: params.cuisine, includePassed: params.includePassed }),
     loadWeights(),
+    loadProfile(),
   ]);
   const filtered = applyFilter(rows, params);
-  const cards = rankCandidates(filtered, weights, {
-    limit: params.limit ?? 10,
+
+  const limit = params.limit ?? 10;
+  // Warmup: the first few swipes after setup put the cuisines you picked first,
+  // ranked by rating, distance, and diet, before learned preferences take over.
+  const warmup =
+    !params.cuisine && profile.cuisines.length > 0 && (await swipesSince(profile.updated_at)) < WARMUP_SWIPES;
+
+  const ranked = rankCandidates(filtered, withProfile(weights, profile), {
+    limit: warmup ? filtered.length : limit,
     maxDistMi: params.maxDistMi ?? search.radius_mi,
-    // Exploring other cuisines makes no sense when you asked for one.
-    exploreRate: params.cuisine ? 0 : EXPLORE_RATE,
+    // Exploring other cuisines makes no sense when you asked for one, or while warming up.
+    exploreRate: params.cuisine || warmup ? 0 : EXPLORE_RATE,
+    dietary: profile.dietary,
   });
+  // Picked cuisines first, then everything else, so a thin pick never empties the deck.
+  const isPicked = (c: Candidate) => c.cuisine !== null && profile.cuisines.includes(c.cuisine);
+  const cards = warmup ? [...ranked.filter(isPicked), ...ranked.filter((c) => !isPicked(c))].slice(0, limit) : ranked;
   return { cards, remaining: filtered.length, search };
 }
 

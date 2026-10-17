@@ -71,3 +71,9 @@ export const PlateIcon = ({ className }: Props) => (
     <circle cx="12" cy="12" r="9.5" />
   </svg>
 );
+
+export const ChevronDownIcon = ({ className }: Props) => (
+  <svg {...base} strokeWidth={2.2} className={className}>
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);

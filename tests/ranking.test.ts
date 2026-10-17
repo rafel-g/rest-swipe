@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   applyFilter,
   featuresOf,
+  fitsDietary,
   isOpenAt,
   qualityScore,
   rankCandidates,
   updateWeights,
   WEIGHT_LIMIT,
+  withProfile,
   type Candidate,
   type Weights,
 } from "@/lib/ranking";
@@ -161,5 +163,38 @@ describe("filters and hours", () => {
     expect(ids({ maxPrice: 2 })).toEqual(["b", "c"]);
     expect(ids({ maxDistMi: 10 })).toEqual(["a", "b"]);
     expect(ids({ openNow: true })).toEqual(["a"]);
+  });
+});
+
+describe("setup profile", () => {
+  it("gives picked cuisines a head start without touching stored weights", () => {
+    const learned: Weights = { "cuisine:thai": 0.3 };
+    const merged = withProfile(learned, { cuisines: ["thai", "sushi"], dietary: [] });
+    expect(merged["cuisine:thai"]).toBeCloseTo(1.3);
+    expect(merged["cuisine:sushi"]).toBe(1);
+    expect(learned).toEqual({ "cuisine:thai": 0.3 });
+  });
+
+  it("ranks a picked cuisine above an otherwise identical place", () => {
+    const cands = [place({ place_id: "a", cuisine: "italian" }), place({ place_id: "b", cuisine: "thai" })];
+    const ranked = rankCandidates(cands, withProfile({}, { cuisines: ["thai"], dietary: [] }), noExplore);
+    expect(ranked[0].place_id).toBe("b");
+  });
+
+  it("matches diets by tag or cuisine and requires every restriction", () => {
+    expect(fitsDietary({ cuisine: "thai", tags: ["vegan-options"] }, ["vegan"])).toBe(true);
+    expect(fitsDietary({ cuisine: "vegetarian", tags: [] }, ["vegetarian"])).toBe(true);
+    expect(fitsDietary({ cuisine: "thai", tags: ["vegetarian-friendly"] }, ["vegan"])).toBe(false);
+    expect(fitsDietary({ cuisine: "thai", tags: ["vegan-options"] }, ["vegan", "gluten-free"])).toBe(false);
+  });
+
+  it("puts diet-friendly places first but still shows the rest", () => {
+    const cands = [
+      place({ place_id: "steak", cuisine: "steakhouse", rating: 4.8, rating_count: 3000 }),
+      place({ place_id: "veg", tags: ["vegetarian-friendly"], rating: 4.2 }),
+    ];
+    const ranked = rankCandidates(cands, {}, { ...noExplore, dietary: ["vegetarian"] });
+    expect(ranked.map((c) => c.place_id)).toEqual(["veg", "steak"]);
+    expect(ranked[0].reasons[0]).toBe("Fits vegetarian");
   });
 });
